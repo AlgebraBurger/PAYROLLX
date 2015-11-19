@@ -57,18 +57,18 @@ namespace HRPAYROLLCONSOLE
             {
 
                 var totalDaysWorked = 0;
-                var RegularDayHoursCount = 0;
-                var DoubleHolidayHoursCount = 0;
-                var DoubleHolidayRestDayHoursCount = 0;
-                var OrdinaryDayHoursCount = 0;
-                var RegularDayRestDayHoursCount = 0;
-                var RestDayHoursCount = 0;
-                var SpecialDayHoursCount = 0;
-                var SpecialDayRestDayHoursCount = 0;
+                double RegularDayHoursCount = 0;
+                double DoubleHolidayHoursCount = 0;
+                double DoubleHolidayRestDayHoursCount = 0;
+                double OrdinaryDayHoursCount = 0;
+                double RegularDayRestDayHoursCount = 0;
+                double RestDayHoursCount = 0;
+                double SpecialDayHoursCount = 0;
+                double SpecialDayRestDayHoursCount = 0;
 
-                var totalHoursLate = 0;
-                var totalHoursUnderTime = 0;
-                var totalHoursOverTime = 0;
+                double totalHoursLate = 0;
+                double totalHoursUnderTime = 0;
+                double totalHoursOverTime = 0;
 
 
                 //get attendace
@@ -84,21 +84,31 @@ namespace HRPAYROLLCONSOLE
                     {
 
                         if (e.checkType == CheckType.I)
-                        {   PunchCards.Add(new DailyAttendanceRow() { AccountID = employee.AccountID, IN = e.DateLog }); }
+                        {
+                            PunchCards.Add(new DailyAttendanceRow()
+                            {
+                                AccountID = employee.AccountID,
+                                IN = e.DateLog
+                            });
+                        }
                         if (e.checkType == CheckType.O)
                         {
                             foreach (var i in PunchCards)
                             {
-                                if (i.IN.Date == e.DateLog.Date){ i.OUT = e.DateLog; }                                
+                                if (i.IN.Date == e.DateLog.Date)
+                                {
+                                    i.OUT = e.DateLog;
+                                }                                
                             }
                             
                         }
 
                     }
 
+                    var pCards = PunchCards.Where(x => x.IN.Year != 0001 && x.OUT.Year != 0001).Distinct();
+                    pCards = pCards.GroupBy(x => x.IN.Date).Select(g => g.First()).ToList();
 
-                   
-                    foreach (var e in PunchCards)
+                    foreach (var e in pCards)
                     {
                         TimeSpan duration;
                         if (e.IN.Year != 0001 && e.OUT.Year!=0001)
@@ -120,31 +130,60 @@ namespace HRPAYROLLCONSOLE
 
                         TimeSpan late = e.IN.TimeOfDay - config.StartDay.TimeOfDay;
                         TimeSpan OT = e.OUT.TimeOfDay - config.EndDay.TimeOfDay;
+                        TimeSpan UT = config.EndDay.TimeOfDay - e.OUT.TimeOfDay;
 
-                        Console.WriteLine(e.IN + " = " + e.OUT + " = " + duration.Hours + " : L?" + late.TotalHours + ": OT?" + OT.TotalHours);
+                        Console.WriteLine(e.IN + " = " + e.OUT + " = " + duration.TotalHours + " : L?" + late.TotalHours + ": OT?" + OT.TotalHours + " : UT? " + UT.TotalHours);
+
+                        if (late.TotalHours > 0)
+                        {
+                            totalHoursLate = late.TotalHours;
+                        }
+
+                        if (OT.TotalHours > 0)
+                        {
+                            //is this OT approved?
+                            // check OT Request Table
+
+                            //if Approved, what is the Type of Day to know the Value of OT.
+                           
+
+                            var calendarList = calendar.Where(x => x.EventDate.Date == e.IN.Date);
+                            if (calendarList.Count() > 0)
+                            {
+                                foreach (var cal in calendarList)
+                                {
+                                    switch (cal.typeOfWorkingDay)
+                                    {
+                                        case TypeOfWorkingDay.OrdinaryDay: OrdinaryDayHoursCount += OT.TotalHours; break;
+                                        case TypeOfWorkingDay.DoubleHoliday: DoubleHolidayHoursCount += OT.TotalHours; break;
+                                        case TypeOfWorkingDay.DoubleHolidayRestDay: DoubleHolidayRestDayHoursCount += OT.TotalHours; break;
+                                        case TypeOfWorkingDay.RegularDay: RestDayHoursCount += OT.TotalHours; break;
+                                        case TypeOfWorkingDay.RegularDayRestDay: RegularDayRestDayHoursCount += OT.TotalHours; break;
+                                        case TypeOfWorkingDay.RestDay: RestDayHoursCount += OT.TotalHours; break;
+                                        case TypeOfWorkingDay.SpecialDay: SpecialDayHoursCount += OT.TotalHours; break;
+                                        case TypeOfWorkingDay.SpecialDayRestDay: SpecialDayRestDayHoursCount += OT.TotalHours; break;
+                                        default: OrdinaryDayHoursCount += OT.TotalHours; break;
+
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                //ordinary day
+                                OrdinaryDayHoursCount += OT.TotalHours;
+                            }
+
+                        }
+
+                        if (UT.TotalHours > 0)
+                        {
+                            totalHoursUnderTime = UT.TotalHours;
+                        }
+                        
                         
 
 
-
-                        var calendarList = calendar.Where(x => x.EventDate.Date == e.IN.Date);
-                        if (calendarList.Count() > 0)
-                        {
-                            foreach (var cal in calendarList)
-                            {
-                                switch (cal.typeOfWorkingDay)
-                                {
-                                    case TypeOfWorkingDay.OrdinaryDay: OrdinaryDayHoursCount = 0; break;
-                                    case TypeOfWorkingDay.DoubleHoliday: DoubleHolidayHoursCount = 0; break;
-                                    case TypeOfWorkingDay.DoubleHolidayRestDay: DoubleHolidayRestDayHoursCount = 0;  break;
-                                    case TypeOfWorkingDay.RegularDay: RestDayHoursCount = 0; break;
-                                    case TypeOfWorkingDay.RegularDayRestDay: RegularDayRestDayHoursCount = 0; break;
-                                    case TypeOfWorkingDay.RestDay: RestDayHoursCount = 0; break;
-                                    case TypeOfWorkingDay.SpecialDay: SpecialDayHoursCount = 0; break;
-                                    case TypeOfWorkingDay.SpecialDayRestDay: SpecialDayRestDayHoursCount = 0; break;
-
-                                }
-                            }
-                        }
+                        
 
 
                     }
@@ -156,20 +195,21 @@ namespace HRPAYROLLCONSOLE
 
                 }
 
+                Console.WriteLine(OrdinaryDayHoursCount);
                
                 Attendance att = new Attendance()
                 {
                     NumberOfDaysWorked = totalDaysWorked,
                     TotalWorkingDays = config.TotalWorkingDays,
                     
-                    RegularDayHoursCount = 0,
-                    DoubleHolidayHoursCount = 0,
-                    DoubleHolidayRestDayHoursCount = 0,
-                    OrdinaryDayHoursCount = 0,
-                    RegularDayRestDayHoursCount = 0,
-                    RestDayHoursCount = 0,
-                    SpecialDayHoursCount = 0,
-                    SpecialDayRestDayHoursCount = 0,
+                    RegularDayHoursCount = RegularDayHoursCount,
+                    DoubleHolidayHoursCount = DoubleHolidayHoursCount,
+                    DoubleHolidayRestDayHoursCount = DoubleHolidayRestDayHoursCount,
+                    OrdinaryDayHoursCount = OrdinaryDayHoursCount,
+                    RegularDayRestDayHoursCount = RegularDayRestDayHoursCount,
+                    RestDayHoursCount = RestDayHoursCount,
+                    SpecialDayHoursCount = SpecialDayHoursCount,
+                    SpecialDayRestDayHoursCount = SpecialDayRestDayHoursCount,
                 };
 
                 employee.attendace = att;
@@ -346,35 +386,35 @@ namespace HRPAYROLLCONSOLE
 
                 if (employee.attendace.OrdinaryDayHoursCount > 0)
                 {
-                    OTAmount = OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.OrdinaryDayHoursCount);
+                    OTAmount += OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.OrdinaryDayHoursCount);
                 }
                 if (employee.attendace.RestDayHoursCount > 0)
                 {
-                    OTAmount = OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.RestDayHoursCount);
+                    OTAmount += OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.RestDayHoursCount);
                 }
                 if (employee.attendace.SpecialDayHoursCount > 0)
                 {
-                    OTAmount = OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.SpecialDayHoursCount);
+                    OTAmount += OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.SpecialDayHoursCount);
                 }
                 if (employee.attendace.SpecialDayRestDayHoursCount > 0)
                 {
-                    OTAmount = OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.SpecialDayRestDayHoursCount);
+                    OTAmount += OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.SpecialDayRestDayHoursCount);
                 }
                 if (employee.attendace.RegularDayHoursCount > 0)
                 {
-                    OTAmount = OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.RegularDayHoursCount);
+                    OTAmount += OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.RegularDayHoursCount);
                 }
                 if (employee.attendace.RegularDayRestDayHoursCount > 0)
                 {
-                    OTAmount = OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.RegularDayRestDayHoursCount);
+                    OTAmount += OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.RegularDayRestDayHoursCount);
                 }
                 if (employee.attendace.DoubleHolidayHoursCount > 0)
                 {
-                    OTAmount = OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.DoubleHolidayHoursCount);
+                    OTAmount += OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.DoubleHolidayHoursCount);
                 }
                 if (employee.attendace.DoubleHolidayRestDayHoursCount > 0)
                 {
-                    OTAmount = OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.DoubleHolidayRestDayHoursCount);
+                    OTAmount += OverTimeTable.getOTPremium(TypeOfWorkingDay.OrdinaryDay, hourlyRate, employee.attendace.DoubleHolidayRestDayHoursCount);
                 }
 
 
