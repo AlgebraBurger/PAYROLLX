@@ -66,6 +66,11 @@ namespace HRPAYROLLCONSOLE
                 var SpecialDayHoursCount = 0;
                 var SpecialDayRestDayHoursCount = 0;
 
+                var totalHoursLate = 0;
+                var totalHoursUnderTime = 0;
+                var totalHoursOverTime = 0;
+
+
                 //get attendace
                 List<DateTime> dlog = new List<DateTime>();
                 List<DailyAttendanceRow> PunchCards = new List<DailyAttendanceRow>();
@@ -118,6 +123,9 @@ namespace HRPAYROLLCONSOLE
 
                         Console.WriteLine(e.IN + " = " + e.OUT + " = " + duration.Hours + " : L?" + late.TotalHours + ": OT?" + OT.TotalHours);
                         
+
+
+
                         var calendarList = calendar.Where(x => x.EventDate.Date == e.IN.Date);
                         if (calendarList.Count() > 0)
                         {
