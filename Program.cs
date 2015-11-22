@@ -11,6 +11,52 @@ namespace HRPAYROLLCONSOLE
         static void Main(string[] args)
         {
 
+
+            //-----------------------------------------------------------------
+            // get every end of the month
+
+            DateTime today = DateTime.Today;
+            DateTime endOfMonth = new DateTime(today.Year,
+                                               today.Month,
+                                               DateTime.DaysInMonth(today.Year,
+                                                                    today.Month));
+
+
+
+            Console.WriteLine("Today is : " + today + ": which is " + today.DayOfWeek);
+
+            Console.WriteLine(" -------------------- \t");
+            Console.WriteLine("Last Day of the Month" + endOfMonth);
+
+
+
+            //-------------------------------------------------------------------
+
+
+            var holidays = new List<DateTime> {/* list of observed holidays */};
+            DateTime lastBusinessDay = new DateTime();
+            var s = DateTime.DaysInMonth(2015, 11);
+            while (s > 0)
+            {
+                var dtCurrent = new DateTime(2015, 11, s);
+                if (dtCurrent.DayOfWeek < DayOfWeek.Saturday && dtCurrent.DayOfWeek > DayOfWeek.Sunday &&
+                 !holidays.Contains(dtCurrent))
+                {
+                    lastBusinessDay = dtCurrent;
+                    s = 0;
+                }
+                else
+                {
+                    s = s - 1;
+                }
+            }
+            Console.WriteLine(" -------------------- \t");
+            Console.WriteLine("Last Business Day" + lastBusinessDay + "Which is " + lastBusinessDay.DayOfWeek);
+            //--------------------------------------------------------------------
+
+
+
+
             AppConfig config = new AppConfig()
             {
                 CompanyName = "HR PAYROLL SYSTEM",
@@ -28,7 +74,7 @@ namespace HRPAYROLLCONSOLE
             {
                 new Employee()
                 {
-                    AccountID = "29014",
+                    AccountID = "106",
                     FirstName = "Julius",
                     LastName = "Bacosa",
                     taxStatus = TaxStatus.Single,
@@ -48,14 +94,9 @@ namespace HRPAYROLLCONSOLE
             var calendar = Calendar.getCalendar();
 
             //calculator 
-
-
-
-            
-
             foreach (var employee in employees)
             {
-
+                Console.WriteLine(employee.AccountID);
                 var totalDaysWorked = 0;
                 double RegularDayHoursCount = 0;
                 double DoubleHolidayHoursCount = 0;
@@ -68,7 +109,7 @@ namespace HRPAYROLLCONSOLE
 
                 double totalHoursLate = 0;
                 double totalHoursUnderTime = 0;
-                double totalHoursOverTime = 0;
+           
 
 
                 //get attendace
@@ -106,6 +147,7 @@ namespace HRPAYROLLCONSOLE
                     }
 
                     var pCards = PunchCards.Where(x => x.IN.Year != 0001 && x.OUT.Year != 0001).Distinct();
+                    //var pCards = PunchCards;
                     pCards = pCards.GroupBy(x => x.IN.Date).Select(g => g.First()).ToList();
 
                     foreach (var e in pCards)
@@ -118,6 +160,7 @@ namespace HRPAYROLLCONSOLE
                         }
                         else
                         {
+                            //not valid date
                             duration = DateTime.Now - DateTime.Now;
                         }
 
@@ -136,7 +179,7 @@ namespace HRPAYROLLCONSOLE
 
                         if (late.TotalHours > 0)
                         {
-                            totalHoursLate = late.TotalHours;
+                            totalHoursLate += late.TotalHours;
                         }
 
                         if (OT.TotalHours > 0)
@@ -144,9 +187,7 @@ namespace HRPAYROLLCONSOLE
                             //is this OT approved?
                             // check OT Request Table
 
-                            //if Approved, what is the Type of Day to know the Value of OT.
-                           
-
+                            //if Approved, what is the Type of Day to know the Value of OT.                           
                             var calendarList = calendar.Where(x => x.EventDate.Date == e.IN.Date);
                             if (calendarList.Count() > 0)
                             {
@@ -177,18 +218,9 @@ namespace HRPAYROLLCONSOLE
 
                         if (UT.TotalHours > 0)
                         {
-                            totalHoursUnderTime = UT.TotalHours;
-                        }
-                        
-                        
-
-
-                        
-
-
-                    }
-                    
-
+                            totalHoursUnderTime += UT.TotalHours;
+                        }                        
+                    }                    
                 }
                 else
                 {
@@ -196,12 +228,13 @@ namespace HRPAYROLLCONSOLE
                 }
 
                 Console.WriteLine(OrdinaryDayHoursCount);
-               
+
                 Attendance att = new Attendance()
                 {
                     NumberOfDaysWorked = totalDaysWorked,
                     TotalWorkingDays = config.TotalWorkingDays,
-                    
+                    TotalLateHours = totalHoursLate,
+                    TotalHoursUnderTime  = totalHoursUnderTime,
                     RegularDayHoursCount = RegularDayHoursCount,
                     DoubleHolidayHoursCount = DoubleHolidayHoursCount,
                     DoubleHolidayRestDayHoursCount = DoubleHolidayRestDayHoursCount,
@@ -301,8 +334,15 @@ namespace HRPAYROLLCONSOLE
             
             Console.WriteLine("-----------------------------------------------------------\t");
             Console.WriteLine("Basic Pay: " + pay.BasicPay + "\t");
-            Console.WriteLine("OT Pay: " + pay.TotalOTAmount + "\t");
+            Console.WriteLine("OT Pay: +" + pay.TotalOTAmount + "\t");
+            Console.WriteLine("Total Late Deduction: -" + pay.TotalLateDeduction + "\t");
+            Console.WriteLine("-----------------------------------------------------------\t");
             Console.WriteLine("Gross Pay: " + pay.GrossPay + "\t");
+            Console.WriteLine("-----------------------------------------------------------\t");
+
+           
+
+            Console.WriteLine("                                                           \t");
             Console.WriteLine("-----------------------------------------------------------\t");
             Console.WriteLine("WithHolding Tax: " + pay.WithHoldingTax + "\t");
             Console.WriteLine("SSS Contribution: " + pay.SSSContribution + "\t");
@@ -352,10 +392,10 @@ namespace HRPAYROLLCONSOLE
 
                     //    withHoldingTax = taxAmount + (excess * taxRate);
                     //}
-                    if (row.baseSalary < employee.attendace.BasicPay && row.rangeSalary >= employee.attendace.BasicPay)
+                    if (row.baseSalary < employee.attendace.GrossPay && row.rangeSalary >= employee.attendace.GrossPay)
                     {
                         taxAmount = row.taxAmount;
-                        excess = employee.attendace.BasicPay - row.baseSalary;
+                        excess = employee.attendace.GrossPay - row.baseSalary;
                         taxRate = row.excessRate / 100;
 
                         withHoldingTax = taxAmount + (excess * taxRate);
@@ -427,7 +467,17 @@ namespace HRPAYROLLCONSOLE
 
                 var  latePolicy = latePolicyTable.getTable();
 
-                double grossPay = basicPay + taxableAllowance + nonTaxableAllowance +  OTAmount;
+
+                var lPolicy = latePolicy.Find(x => x.latePolicyType == latePolicyType.TypeA);
+
+                var totalLateDeduction = employee.attendace.TotalLateHours * lPolicy.deductionAmount;
+                var totalUnderTimeDeduction = employee.attendace.TotalHoursUnderTime * lPolicy.deductionAmount;
+
+                double grossPay = (basicPay + taxableAllowance + nonTaxableAllowance +  OTAmount) - totalLateDeduction - totalUnderTimeDeduction;
+
+                employee.attendace.GrossPay = grossPay;
+
+                // --- deductions ---
 
                 double withHoldingTax = 0; // how to compute withholding
 
@@ -527,6 +577,7 @@ namespace HRPAYROLLCONSOLE
                 {
                     BasicPay = basicPay,
                     TotalOTAmount = OTAmount,
+                    TotalLateDeduction = totalLateDeduction,
                     HourlyRate = hourlyRate,
                     EmployeeName = employee.FirstName + " " + employee.LastName,
                     TaxableAllowance = taxableAllowance,
@@ -552,7 +603,10 @@ namespace HRPAYROLLCONSOLE
             public int NumberOfDaysWorked { get; set; }
           
             public double BasicPay { get; set; }
+            public double GrossPay { get; set; }
 
+            public double TotalLateHours { get; set; }
+            public double TotalHoursUnderTime { get; set; }
             public double TaxableAllowance { get; set; }
             public double NonTaxableAllowance { get; set; }
 
@@ -582,9 +636,7 @@ namespace HRPAYROLLCONSOLE
             public string AccountID { get; set; }
             public string FirstName { get; set; }
             public string LastName { get; set; }
-
             
-
             public int NumberOfDependents { get; set; }
             public TaxStatus taxStatus { get; set; }
             public double MonthlySalary { get; set; }
@@ -599,6 +651,7 @@ namespace HRPAYROLLCONSOLE
 
             public int ID { get; set; }
             public string EmployeeName { get; set; }
+            public double TotalLateDeduction { get; set; }
             public double TotalOTAmount { get; set; }
             public double HourlyRate { get; set; }
             public double BasicPay { get; set; }
